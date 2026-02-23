@@ -151,6 +151,12 @@ body {
   <div class="sidebar-footer">
     <button class="footer-btn" onclick="refreshFeed()">↻ Refresh feed</button>
     <button class="footer-btn" onclick="exportSession()" id="export-btn">🔑 Export session</button>
+    <button class="footer-btn" onclick="toggleImport()">📥 Import session</button>
+    <div id="import-panel" style="display:none;padding:6px 8px">
+      <textarea id="import-json" placeholder='Paste {"auth_token":"...","ct0":"..."}' 
+        style="-webkit-app-region:no-drag;width:100%;height:70px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:6px;font-size:10px;resize:none"></textarea>
+      <button class="footer-btn" style="color:#2ecc71;padding:4px 8px" onclick="importSession()">✓ Apply</button>
+    </div>
     <div id="session-out" style="font-size:10px;color:#555;padding:4px 12px;word-break:break-all;display:none"></div>
   </div>
 </div>
@@ -222,6 +228,35 @@ function refreshFeed() {
   }).catch(e => {
     feedEl.innerHTML = `<div class="feed-empty">Error: ${e.message}</div>`;
   });
+}
+
+function toggleImport() {
+  const p = document.getElementById('import-panel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+async function importSession() {
+  const out = document.getElementById('session-out');
+  try {
+    const raw  = document.getElementById('import-json').value.trim();
+    const data = JSON.parse(raw);
+    if (!data.auth_token || !data.ct0) throw new Error('Need auth_token and ct0');
+    const result = await ipcRenderer.invoke('import-session', {
+      accountId: activeId,
+      auth_token: data.auth_token,
+      ct0: data.ct0
+    });
+    if (result.error) throw new Error(result.error);
+    document.getElementById('import-panel').style.display = 'none';
+    out.style.display = 'block';
+    out.style.color = '#2ecc71';
+    out.textContent = '✅ Session imported — reloading X...';
+    setTimeout(() => { out.style.display = 'none'; }, 4000);
+  } catch (e) {
+    out.style.display = 'block';
+    out.style.color = '#e74c3c';
+    out.textContent = '❌ ' + e.message;
+  }
 }
 
 async function exportSession() {

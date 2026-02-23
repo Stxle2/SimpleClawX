@@ -77,6 +77,23 @@ function showAccount(id) {
 ipcMain.on('switch-account', (_, id) => showAccount(id));
 ipcMain.on('open-url', (_, url) => { if (xViews[activeAccount]) xViews[activeAccount].webContents.loadURL(url); });
 
+ipcMain.handle('import-session', async (_, { accountId, auth_token, ct0 }) => {
+  const id   = accountId || activeAccount;
+  const view = xViews[id];
+  if (!view) return { error: 'No active view' };
+  try {
+    const domains = ['.x.com', '.twitter.com'];
+    for (const domain of domains) {
+      await view.webContents.session.cookies.set({ url: 'https://x.com', domain, name: 'auth_token', value: auth_token, httpOnly: true, secure: true });
+      await view.webContents.session.cookies.set({ url: 'https://x.com', domain, name: 'ct0',        value: ct0,        httpOnly: false, secure: true });
+    }
+    view.webContents.loadURL('https://x.com/home');
+    return { success: true };
+  } catch (e) {
+    return { error: e.message };
+  }
+});
+
 ipcMain.handle('export-session', async (_, accountId) => {
   const id   = accountId || activeAccount;
   const view = xViews[id];
