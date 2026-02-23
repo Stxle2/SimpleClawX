@@ -104,9 +104,8 @@ ipcMain.handle('export-session', async (_, accountId) => {
     const all = [...allCookies, ...xCookies];
     const get = name => all.find(c => c.name === name)?.value;
     const auth_token = get('auth_token');
-    const ct0        = get('ct0');
+    const ct0        = get('ct0') || '';
     if (!auth_token) return { error: 'Not logged in — no auth_token found' };
-    const ct0 = get('ct0') || '';
     return { auth_token, ct0, account: id };
   } catch (e) {
     return { error: e.message };
