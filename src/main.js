@@ -78,16 +78,19 @@ ipcMain.on('switch-account', (_, id) => showAccount(id));
 ipcMain.on('open-url', (_, url) => { if (xViews[activeAccount]) xViews[activeAccount].webContents.loadURL(url); });
 
 ipcMain.handle('export-session', async (_, accountId) => {
-  const view = xViews[accountId || activeAccount];
+  const id   = accountId || activeAccount;
+  const view = xViews[id];
   if (!view) return { error: 'No active view' };
   try {
-    const cookies = await view.webContents.executeJavaScript(`
-      document.cookie.split(';').reduce((o,x) => {
-        const [k,v] = x.trim().split('='); o[k]=v; return o;
-      }, {})
-    `);
-    if (!cookies.auth_token || !cookies.ct0) return { error: 'Not logged in to X in this view' };
-    return { auth_token: cookies.auth_token, ct0: cookies.ct0, account: accountId || activeAccount };
+    // Use Electron session API to get HttpOnly cookies too
+    const allCookies = await view.webContents.session.cookies.get({ domain: '.twitter.com' });
+    const xCookies   = await view.webContents.session.cookies.get({ domain: '.x.com' });
+    const all = [...allCookies, ...xCookies];
+    const get = name => all.find(c => c.name === name)?.value;
+    const auth_token = get('auth_token');
+    const ct0        = get('ct0');
+    if (!auth_token) return { error: 'Not logged in — no auth_token found' };
+    return { auth_token, ct0, account: id };
   } catch (e) {
     return { error: e.message };
   }
