@@ -26,12 +26,18 @@ body {
   padding-top: 36px; /* space for traffic lights */
 }
 
+.drag-handle {
+  height: 36px;
+  -webkit-app-region: drag;
+  flex-shrink: 0;
+}
 .logo {
-  padding: 14px 16px 20px;
+  padding: 0 16px 20px;
   font-size: 17px;
   font-weight: 700;
   letter-spacing: -0.3px;
   color: #fff;
+  -webkit-app-region: drag;
 }
 .logo span { color: #1d9bf0; }
 
@@ -45,6 +51,9 @@ body {
   padding: 0 16px 8px;
 }
 
+.account-btn, .footer-btn, .feed-item {
+  -webkit-app-region: no-drag;
+}
 .account-btn {
   display: flex;
   align-items: center;
@@ -126,6 +135,7 @@ body {
 <body>
 
 <div class="sidebar">
+  <div class="drag-handle"></div>
   <div class="logo">Simple<span>Claw</span>X</div>
 
   <div class="section-label">Accounts</div>
