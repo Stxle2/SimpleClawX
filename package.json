@@ -1,0 +1,17 @@
+{
+  "name": "simpleclawx",
+  "version": "0.1.0",
+  "description": "Multi-account X wrapper with OpenClaw agent feed integration",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --mac"
+  },
+  "keywords": ["openclaw", "twitter", "x", "multi-account"],
+  "author": "Stxle2",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0"
+  }
+}

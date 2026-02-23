@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>SimpleClawX</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #000;
+  color: #e8e8f0;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 220px;
+  min-width: 220px;
+  background: #0a0a0f;
+  border-right: 1px solid #1a1a2a;
+  display: flex;
+  flex-direction: column;
+  padding-top: 36px; /* space for traffic lights */
+}
+
+.logo {
+  padding: 14px 16px 20px;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: #fff;
+}
+.logo span { color: #1d9bf0; }
+
+/* Account switcher */
+.section-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #444;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  padding: 0 16px 8px;
+}
+
+.account-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  border-radius: 10px;
+  margin: 2px 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #aaa;
+  transition: all 0.15s;
+  border: none;
+  background: none;
+  text-align: left;
+  width: calc(100% - 16px);
+}
+.account-btn:hover { background: #111118; color: #fff; }
+.account-btn.active { background: #111118; color: #fff; }
+.account-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Watcher feed */
+.feed-section {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  margin-top: 16px;
+}
+.feed-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px 16px;
+}
+.feed-scroll::-webkit-scrollbar { width: 4px; }
+.feed-scroll::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
+
+.feed-item {
+  background: #0f0f1a;
+  border: 1px solid #1a1a2a;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.feed-item:hover { border-color: #1d9bf0; }
+.feed-handle { color: #1d9bf0; font-weight: 600; margin-bottom: 4px; }
+.feed-text { color: #ccc; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.feed-empty { color: #444; font-size: 11px; padding: 8px 4px; }
+
+/* Bottom actions */
+.sidebar-footer {
+  padding: 12px 8px;
+  border-top: 1px solid #1a1a2a;
+}
+.footer-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #666;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+.footer-btn:hover { background: #111118; color: #aaa; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="logo">Simple<span>Claw</span>X</div>
+
+  <div class="section-label">Accounts</div>
+  <div id="accounts"></div>
+
+  <div class="feed-section">
+    <div class="section-label" style="margin-top:8px">🐦 Watcher</div>
+    <div class="feed-scroll" id="feed">
+      <div class="feed-empty">Loading watched accounts...</div>
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+    <button class="footer-btn" onclick="refreshFeed()">↻ Refresh feed</button>
+  </div>
+</div>
+
+<script>
+const { ipcRenderer } = require('electron');
+const https = require('https');
+const { execSync } = require('child_process');
+
+let accounts = [];
+let activeId = null;
+let watched = [];
+
+// ── Render accounts ──────────────────────────────────────────
+ipcRenderer.on('accounts', (_, list) => {
+  accounts = list;
+  const el = document.getElementById('accounts');
+  el.innerHTML = list.map(a => `
+    <button class="account-btn" id="btn-${a.id}" onclick="switchAccount('${a.id}')">
+      <div class="account-dot" style="background:${a.color}"></div>
+      ${a.label}
+    </button>
+  `).join('');
+});
+
+ipcRenderer.on('active-account', (_, id) => {
+  activeId = id;
+  document.querySelectorAll('.account-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + id)?.classList.add('active');
+});
+
+ipcRenderer.on('watched', (_, list) => {
+  watched = list;
+  refreshFeed();
+});
+
+function switchAccount(id) {
+  ipcRenderer.send('switch-account', id);
+}
+
+// ── Watcher feed ─────────────────────────────────────────────
+function refreshFeed() {
+  const feedEl = document.getElementById('feed');
+  feedEl.innerHTML = '<div class="feed-empty">Fetching...</div>';
+
+  const BEARER = 'AAAAAAAAAAAAAAAAAAAAABG87gEAAAAApZAuOrncbhLdRzJY8Qi0pVZSZxw%3DrhLpHXiLG4UTeSChUO501BvG3cWnch4Zq4IHf3RzIs8QD3R6or';
+  const results = [];
+
+  Promise.all(watched.map(handle =>
+    fetch(`https://api.twitter.com/2/users/by/username/${handle}`, {
+      headers: { Authorization: `Bearer ${BEARER}` }
+    })
+    .then(r => r.json())
+    .then(u => {
+      if (!u.data?.id) return [];
+      return fetch(`https://api.twitter.com/2/users/${u.data.id}/tweets?max_results=3&tweet.fields=created_at&exclude=retweets,replies`, {
+        headers: { Authorization: `Bearer ${BEARER}` }
+      }).then(r => r.json()).then(d => (d.data || []).map(t => ({ handle, text: t.text, id: t.id })));
+    })
+  )).then(all => {
+    const flat = all.flat();
+    if (!flat.length) { feedEl.innerHTML = '<div class="feed-empty">No recent tweets</div>'; return; }
+    feedEl.innerHTML = flat.map(t => `
+      <div class="feed-item" onclick="openTweet('${t.handle}','${t.id}')">
+        <div class="feed-handle">@${t.handle}</div>
+        <div class="feed-text">${t.text.replace(/</g,'&lt;').slice(0,120)}</div>
+      </div>
+    `).join('');
+  }).catch(e => {
+    feedEl.innerHTML = `<div class="feed-empty">Error: ${e.message}</div>`;
+  });
+}
+
+function openTweet(handle, id) {
+  // Load tweet URL in current view
+  ipcRenderer.send('open-url', `https://x.com/${handle}/status/${id}`);
+}
+</script>
+</body>
+</html>
