@@ -150,6 +150,8 @@ body {
 
   <div class="sidebar-footer">
     <button class="footer-btn" onclick="refreshFeed()">↻ Refresh feed</button>
+    <button class="footer-btn" onclick="exportSession()" id="export-btn">🔑 Export session</button>
+    <div id="session-out" style="font-size:10px;color:#555;padding:4px 12px;word-break:break-all;display:none"></div>
   </div>
 </div>
 
@@ -220,6 +222,27 @@ function refreshFeed() {
   }).catch(e => {
     feedEl.innerHTML = `<div class="feed-empty">Error: ${e.message}</div>`;
   });
+}
+
+async function exportSession() {
+  const btn = document.getElementById('export-btn');
+  const out  = document.getElementById('session-out');
+  btn.textContent = '⏳ Exporting...';
+  const result = await ipcRenderer.invoke('export-session', activeId);
+  btn.textContent = '🔑 Export session';
+  if (result.error) {
+    out.style.display = 'block';
+    out.style.color = '#e74c3c';
+    out.textContent = '❌ ' + result.error;
+    return;
+  }
+  const json = JSON.stringify(result, null, 2);
+  // Copy to clipboard
+  require('electron').clipboard.writeText(json);
+  out.style.display = 'block';
+  out.style.color = '#2ecc71';
+  out.textContent = '✅ Copied to clipboard! Paste to VM: ~/.config/lumavita/x-session.json';
+  setTimeout(() => { out.style.display = 'none'; }, 5000);
 }
 
 function openTweet(handle, id) {

@@ -77,6 +77,22 @@ function showAccount(id) {
 ipcMain.on('switch-account', (_, id) => showAccount(id));
 ipcMain.on('open-url', (_, url) => { if (xViews[activeAccount]) xViews[activeAccount].webContents.loadURL(url); });
 
+ipcMain.handle('export-session', async (_, accountId) => {
+  const view = xViews[accountId || activeAccount];
+  if (!view) return { error: 'No active view' };
+  try {
+    const cookies = await view.webContents.executeJavaScript(`
+      document.cookie.split(';').reduce((o,x) => {
+        const [k,v] = x.trim().split('='); o[k]=v; return o;
+      }, {})
+    `);
+    if (!cookies.auth_token || !cookies.ct0) return { error: 'Not logged in to X in this view' };
+    return { auth_token: cookies.auth_token, ct0: cookies.ct0, account: accountId || activeAccount };
+  } catch (e) {
+    return { error: e.message };
+  }
+});
+
 mainWindow?.on('resize', () => {
   if (xViews[activeAccount]) {
     const [, , w, h] = getViewBounds();
