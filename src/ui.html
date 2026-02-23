@@ -240,7 +240,7 @@ async function importSession() {
   try {
     const raw  = document.getElementById('import-json').value.trim();
     const data = JSON.parse(raw);
-    if (!data.auth_token || !data.ct0) throw new Error('Need auth_token and ct0');
+    if (!data.auth_token) throw new Error('Need auth_token');
     const result = await ipcRenderer.invoke('import-session', {
       accountId: activeId,
       auth_token: data.auth_token,
